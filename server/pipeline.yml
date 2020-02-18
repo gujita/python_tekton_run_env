@@ -1,0 +1,58 @@
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: resource-git-for-python-run
+spec:
+  type: git
+  params:
+   - name: url
+     value: https://github.com/cmd-cmd/python_tekton_run_env.git
+   - name: revison
+     value: master
+
+---
+apiVersion: tekton.dev/v1alpha1
+kind: Task
+metadata:
+  name: task-python-run-on-verification-env
+spec:
+  inputs:
+    resources:
+      - name: source-fed-to-task
+        type: git
+  steps:
+    - name: list-source
+      image: ubuntu
+      command: ["/bin/bash"]
+      args: ['-c', 'ls -R $(inputs.resources.source-fed-to-task.path)/']
+    - name: run-on-verification-env
+      image: python:3.6-buster
+      volumeMounts:
+        - name: data-volume
+          mountPath: /var/nfs/
+      workingDir: "$(inputs.resources.source-fed-to-task.path)/"
+      command:
+        - /bin/bash
+      args:
+        - -c
+        - |
+          pip install -r requirements.txt --index https://pypi.tuna.tsinghua.edu.cn/simple
+          python main.py
+  volumes:
+    - name: data-volume
+      hostPath:
+        path: /var/nfs/
+
+---
+apiVersion: tekton.dev/v1alpha1
+kind: TaskRun
+metadata:
+  name: taskrun-python-run-on-verification-env
+spec:
+  taskRef:
+    name: task-python-run-on-verification-env
+  inputs:
+    resources:
+      - name: source-fed-to-task
+        resourceRef:
+          name: resource-git-for-python-run
